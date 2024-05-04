@@ -11,6 +11,8 @@ pico_sdk_init()
 
 add_executable(cap_template
   main.c
+  protocol.c
+  tests.c
 )
 
 pico_enable_stdio_usb(cap_template 1)
