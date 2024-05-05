@@ -145,7 +145,7 @@ int protocol_receive() {
     packet_length += getchar();
     uint8_t packet[packet_length];
     packet[0] = start_marker;
-    packet[1] = packet_length >> 8;
+    packet[1] = packet_length << 8;
     packet[2] = packet_length;
     packet[3] = getchar();
     if (packet[3] != 2) {

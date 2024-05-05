@@ -194,6 +194,7 @@ class CustomProtocol:
 
 p = CustomProtocol()
 p.connect()
+p.test()
 print(p.receive())
 # print(p.receive())
 # print(p.receive())
