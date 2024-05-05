@@ -8,7 +8,7 @@ First, clone the repository locally with the following command:
 
 ```bash
 $ git clone https://gitlab.uwe.ac.uk/y2-abuhummos/cap-protocol
-$ cd cap_protocol
+$ cd cap-protocol
 ```
 
 next a build, run and view output scripts are provided, to build:
