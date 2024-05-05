@@ -1,13 +1,14 @@
 #include "tests.h"
 #include "protocol.h"
+#include <stdio.h>
 
 int wrong() {
-    size_t packet_length = 6;
+    size_t packet_length = 7;
     uint8_t packet[packet_length];
-    uint8_t header[4] = {0xAA, packet_length, 2, 'd'};
+    uint8_t header[5] = {0xAA, packet_length >> 8, packet_length, 2, 'o'};
     uint8_t footer[2] = {0, 0xBB};
-    memcpy(packet, header, 4);
-    memcpy(packet + 4, footer, 2);
+    memcpy(packet, header, 5);
+    memcpy(packet + 5, footer, 2);
 
     // Print packet (just for demonstration)
     for (size_t i = 0; i < packet_length; i++) {
@@ -170,7 +171,7 @@ void test10() {
     int packet_length = protocol_send_open();
     protocol_receive();
     char res[] = "10 ";
-    if (packet_length == 6) {
+    if (packet_length == 7) {
         res[2] = 't';
     } else {
         res[2] = 'f';
@@ -183,7 +184,7 @@ void test11() {
     int packet_length = protocol_send_close();
     protocol_receive();
     char res[] = "11 ";
-    if (packet_length == 6) {
+    if (packet_length == 7) {
         res[2] = 't';
     } else {
         res[2] = 'f';
@@ -195,7 +196,7 @@ void test12() {
     // Test 12: Test the protocol_send_ack function with NO_ERROR.
     int packet_length = protocol_send_ack(NO_ERROR);
     char res[] = "12 ";
-    if (packet_length == 7) {
+    if (packet_length == 8) {
         res[2] = 't';
     } else {
         res[2] = 'f';
@@ -208,7 +209,7 @@ void test13() {
     uint8_t payload[] = {0x00, 0x01, 0x02};
     int packet_length = protocol_send(payload, 3);
     char res[] = "13 ";
-    if (packet_length == 9) {
+    if (packet_length == 10) {
         res[2] = 't';
     } else {
         res[2] = 'f';
@@ -224,7 +225,7 @@ void test14() {
     }
     int packet_length = protocol_send(payload, 240);
     char res[] = "14 ";
-    if (packet_length == 246) {
+    if (packet_length == 247) {
         res[2] = 't';
     } else {
         res[2] = 'f';
@@ -237,7 +238,7 @@ void test15() {
     uint8_t payload[] = "hello";
     int packet_length = protocol_send(payload, 5);
     char res[] = "15 ";
-    if (packet_length == 11) {
+    if (packet_length == 12) {
         res[2] = 't';
     } else {
         res[2] = 'f';
@@ -250,7 +251,7 @@ void test16() {
     uint8_t payload[] = {};
     int packet_length = protocol_send(payload, 0);
     char res[] = "16 ";
-    if (packet_length == 6) {
+    if (packet_length == 7) {
         res[2] = 't';
     } else {
         res[2] = 'f';
@@ -264,7 +265,7 @@ void test17() {
     protocol_send_open();
     int bytes_received = protocol_receive();
     char res[] = "17 ";
-    if (bytes_received == 6) {
+    if (bytes_received == 7) {
         res[2] = 't';
     } else {
         res[2] = 'f';
@@ -278,7 +279,7 @@ void test18() {
     protocol_send_close();
     int bytes_received = protocol_receive();
     char res[] = "18 ";
-    if (bytes_received == 6) {
+    if (bytes_received == 7) {
         res[2] = 't';
     } else {
         res[2] = 'f';
@@ -292,8 +293,9 @@ void test19() {
     uint8_t payload[] = {0x00, 0x01, 0x02};
     protocol_send_echo(payload, 3);
     int bytes_received = protocol_receive();
+    printf("%d", bytes_received);
     char res[] = "19 ";
-    if (bytes_received == 9) {
+    if (bytes_received == 7) {
         res[2] = 't';
     } else {
         res[2] = 'f';
@@ -303,11 +305,11 @@ void test19() {
 void test20() {
     // Test 20: Test the protocol_receive function after sending a wrong crc
     // message.
-    uint8_t payload[] = {0x01, 0x02, 0x03};
+    uint8_t payload[] = {0x00, 0x01, 0x02};
     wrong();
     int bytes_received = protocol_receive();
     char res[] = "20 ";
-    if (bytes_received == 6) {
+    if (bytes_received == 7) {
         res[2] = 't';
     } else {
         res[2] = 'f';

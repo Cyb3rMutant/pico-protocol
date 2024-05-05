@@ -1,10 +1,11 @@
 #include "protocol.h"
 #include "pico/stdlib.h"
+#include "tests.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
-const uint LED_PIN = 25;
+const int LED_PIN = 25;
 int connected;
 
 uint8_t compute_crc(uint8_t *data, size_t len) {
@@ -24,6 +25,7 @@ uint8_t compute_crc(uint8_t *data, size_t len) {
 // Initializes the communication module.
 void protocol_init(void) {
     stdio_init_all();
+    stdio_set_translate_crlf(&stdio_usb, false);
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
     connected = 0;
@@ -39,17 +41,17 @@ int protocol_connect() {
 // Sends data over an established connection.
 // Returns the number of bytes sent.
 int protocol_send(const uint8_t *payload, size_t payload_length) {
-    size_t packet_length = payload_length + 6;
+    size_t packet_length = payload_length + 7;
     uint8_t packet[packet_length];
-    uint8_t header[4] = {0xAA, packet_length, 2, 'd'};
+    uint8_t header[5] = {0xAA, packet_length >> 8, packet_length, 2, 'd'};
     uint8_t footer[2] = {0, 0xBB};
-    memcpy(packet, header, 4);
-    memcpy(packet + 4, payload, payload_length);
-    memcpy(packet + 4 + payload_length, footer, 2);
+    memcpy(packet, header, 5);
+    memcpy(packet + 5, payload, payload_length);
+    memcpy(packet + 5 + payload_length, footer, 2);
 
     // Compute CRC
     uint8_t crc = compute_crc(packet, packet_length);
-    packet[4 + payload_length] = crc;
+    packet[5 + payload_length] = crc;
 
     // Print packet (just for demonstration)
     for (size_t i = 0; i < packet_length; i++) {
@@ -58,17 +60,17 @@ int protocol_send(const uint8_t *payload, size_t payload_length) {
     return packet_length;
 }
 int protocol_send_ack(int err) {
-    size_t packet_length = 1 + 6;
+    size_t packet_length = 1 + 7;
     uint8_t packet[packet_length];
-    uint8_t header[4] = {0xAA, packet_length, 2, 'a'};
+    uint8_t header[5] = {0xAA, packet_length >> 8, packet_length, 2, 'a'};
     uint8_t footer[2] = {0, 0xBB};
-    memcpy(packet, header, 4);
-    packet[4] = err;
-    memcpy(packet + 4 + 1, footer, 2);
+    memcpy(packet, header, 5);
+    packet[5] = err;
+    memcpy(packet + 5 + 1, footer, 2);
 
     // Compute CRC
     uint8_t crc = compute_crc(packet, packet_length);
-    packet[4 + 1] = crc;
+    packet[5 + 1] = crc;
 
     // Print packet (just for demonstration)
     for (size_t i = 0; i < packet_length; i++) {
@@ -77,16 +79,16 @@ int protocol_send_ack(int err) {
     return packet_length;
 }
 int protocol_send_open() {
-    size_t packet_length = 6;
+    size_t packet_length = 7;
     uint8_t packet[packet_length];
-    uint8_t header[4] = {0xAA, packet_length, 2, 'o'};
+    uint8_t header[5] = {0xAA, packet_length >> 8, packet_length, 2, 'o'};
     uint8_t footer[2] = {0, 0xBB};
-    memcpy(packet, header, 4);
-    memcpy(packet + 4, footer, 2);
+    memcpy(packet, header, 5);
+    memcpy(packet + 5, footer, 2);
 
     // Compute CRC
     uint8_t crc = compute_crc(packet, packet_length);
-    packet[4] = crc;
+    packet[5] = crc;
 
     // Print packet (just for demonstration)
     for (size_t i = 0; i < packet_length; i++) {
@@ -95,16 +97,16 @@ int protocol_send_open() {
     return packet_length;
 }
 int protocol_send_close() {
-    size_t packet_length = 6;
+    size_t packet_length = 7;
     uint8_t packet[packet_length];
-    uint8_t header[4] = {0xAA, packet_length, 2, 'c'};
+    uint8_t header[5] = {0xAA, packet_length >> 8, packet_length, 2, 'c'};
     uint8_t footer[2] = {0, 0xBB};
-    memcpy(packet, header, 4);
-    memcpy(packet + 4, footer, 2);
+    memcpy(packet, header, 5);
+    memcpy(packet + 5, footer, 2);
 
     // Compute CRC
     uint8_t crc = compute_crc(packet, packet_length);
-    packet[4] = crc;
+    packet[5] = crc;
 
     // Print packet (just for demonstration)
     for (size_t i = 0; i < packet_length; i++) {
@@ -113,17 +115,17 @@ int protocol_send_close() {
     return packet_length;
 }
 int protocol_send_echo(const uint8_t *payload, size_t payload_length) {
-    size_t packet_length = payload_length + 6;
+    size_t packet_length = payload_length + 7;
     uint8_t packet[packet_length];
-    uint8_t header[4] = {0xAA, packet_length, 2, 'e'};
+    uint8_t header[5] = {0xAA, packet_length >> 8, packet_length, 2, 'e'};
     uint8_t footer[2] = {0, 0xBB};
-    memcpy(packet, header, 4);
-    memcpy(packet + 4, payload, payload_length);
-    memcpy(packet + 4 + payload_length, footer, 2);
+    memcpy(packet, header, 5);
+    memcpy(packet + 5, payload, payload_length);
+    memcpy(packet + 5 + payload_length, footer, 2);
 
     // Compute CRC
     uint8_t crc = compute_crc(packet, packet_length);
-    packet[4 + payload_length] = crc;
+    packet[5 + payload_length] = crc;
 
     // Print packet (just for demonstration)
     for (size_t i = 0; i < packet_length; i++) {
@@ -135,23 +137,24 @@ int protocol_send_echo(const uint8_t *payload, size_t payload_length) {
 // Receives data from an established connection.
 // Returns the number of bytes received.
 int protocol_receive() {
-    printf("waiting for data\n");
     uint8_t start_marker;
     do {
         start_marker = getchar();
     } while (start_marker != 0xAA);
-    uint8_t packet_length = getchar();
+    uint16_t packet_length = getchar() << 8;
+    packet_length += getchar();
     uint8_t packet[packet_length];
     packet[0] = start_marker;
-    packet[1] = packet_length;
-    packet[2] = getchar();
-    if (packet[2] != 2) {
+    packet[1] = packet_length >> 8;
+    packet[2] = packet_length;
+    packet[3] = getchar();
+    if (packet[3] != 2) {
         protocol_send_ack(VERSION);
         printf("wrong version\n");
     }
-    packet[3] = getchar();
-    for (int i = 0; i < packet_length - 6; i++) {
-        packet[4 + i] = getchar();
+    packet[4] = getchar();
+    for (int i = 0; i < packet_length - 7; i++) {
+        packet[5 + i] = getchar();
     }
     uint8_t received_crc = getchar();
     packet[packet_length - 2] = 0;
@@ -168,17 +171,17 @@ int protocol_receive() {
         printf("not the last bit %d\n", packet[packet_length - 1]);
     }
 
-    switch (packet[3]) {
+    switch (packet[4]) {
     case 'a':
-        if (packet[4] == 0) {
+        if (packet[6] == 0) {
             printf("success\n");
-        } else if (packet[4] == 1) {
+        } else if (packet[6] == 1) {
             printf("fail\n");
         }
         break;
     case 'd':
-        for (int i = 0; i < packet_length - 6; i++) {
-            printf("%c", packet[i + 4]);
+        for (int i = 0; i < packet_length - 7; i++) {
+            printf("%c", packet[i + 5]);
         }
         printf("\n");
         break;
@@ -197,15 +200,16 @@ int protocol_receive() {
         }
         break;
     case 'e': {
-        uint8_t payload[packet_length - 6];
-        for (int i = 0; i < packet_length - 6; i++) {
-            payload[i] = packet[i + 4];
+        uint8_t payload[packet_length - 7];
+        for (int i = 0; i < packet_length - 7; i++) {
+            payload[i] = packet[i + 5];
         }
-        protocol_send(payload, packet_length - 6);
+        protocol_send(payload, packet_length - 7);
         break;
     }
     case 't':
         run_tests();
+        break;
     default:
         protocol_send_ack(TYPE);
         printf("wrong\n");

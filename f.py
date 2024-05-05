@@ -7,6 +7,8 @@ CRC = 1
 VERSION = 2
 ENDING = 3
 TYPE = 4
+OPENED = 5
+CLOSED = 6
 
 
 class CustomProtocol:
@@ -34,17 +36,18 @@ class CustomProtocol:
 
     def send(self, payload: bytes):
         """Constructs and sends a packet."""
-        packet_length = len(payload) + 6
-        header = struct.pack(">BBBB", 0xAA, packet_length, 2, ord("d"))
+        packet_length = len(payload) + 7
+        header = struct.pack(">BHBB", 0xAA, packet_length, 2, ord("d"))
         packet = header + payload + struct.pack(">BB", 0, 0xBB)
         crc = self.compute_crc(packet)
         packet = header + payload + struct.pack(">BB", crc, 0xBB)
         self.__ser.write(packet)
+        print(packet)
 
     def send_ack(self, err):
         """Constructs and sends a packet."""
-        packet_length = 1 + 6
-        header = struct.pack(">BBBB", 0xAA, packet_length, 2, ord("a"))
+        packet_length = 1 + 7
+        header = struct.pack(">BHBB", 0xAA, packet_length, 2, ord("a"))
         crc = self.compute_crc(header + struct.pack(">BBB", err, 0, 0xBB))
         footer = struct.pack(">BBB", err, crc, 0xBB)
         packet = header + footer
@@ -52,8 +55,8 @@ class CustomProtocol:
 
     def send_open(self):
         """Constructs and sends a packet."""
-        packet_length = 6
-        header = struct.pack(">BBBB", 0xAA, packet_length, 2, ord("o"))
+        packet_length = 7
+        header = struct.pack(">BHBB", 0xAA, packet_length, 2, ord("o"))
         crc = self.compute_crc(header + struct.pack(">BB", 0, 0xBB))
         footer = struct.pack(">BB", crc, 0xBB)
         packet = header + footer
@@ -61,8 +64,8 @@ class CustomProtocol:
 
     def send_close(self):
         """Constructs and sends a packet."""
-        packet_length = 6
-        header = struct.pack(">BBBB", 0xAA, packet_length, 2, ord("c"))
+        packet_length = 7
+        header = struct.pack(">BHBB", 0xAA, packet_length, 2, ord("c"))
         crc = self.compute_crc(header + struct.pack(">BB", 0, 0xBB))
         footer = struct.pack(">BB", crc, 0xBB)
         packet = header + footer
@@ -70,8 +73,8 @@ class CustomProtocol:
 
     def send_echo(self, payload: bytes):
         """Constructs and sends a packet."""
-        packet_length = len(payload) + 6
-        header = struct.pack(">BBBB", 0xAA, packet_length, 2, ord("e"))
+        packet_length = len(payload) + 7
+        header = struct.pack(">BHBB", 0xAA, packet_length, 2, ord("e"))
         packet = header + payload + struct.pack(">BB", 0, 0xBB)
         crc = self.compute_crc(packet)
         packet = header + payload + struct.pack(">BB", crc, 0xBB)
@@ -83,21 +86,27 @@ class CustomProtocol:
         if start_marker != b"\xAA":
             # Discard bytes until start marker is found
             while start_marker != b"\xAA":
+                print("a---", start_marker)
+                # print("start_marker", start_marker)
                 start_marker = self.__ser.read(1)
 
-        length_byte = self.__ser.read(1)
-        packet_length = struct.unpack(">B", length_byte)[0]
-
+        length_byte = self.__ser.read(2)
+        # print("length_byte", length_byte)
+        packet_length = struct.unpack(">H", length_byte)[0]
+        # print("packet_length", packet_length)
         protocol_version = self.__ser.read(1)
+        # print("protocol_version", protocol_version)
         if protocol_version != b"\x02":
             self.send_ack(VERSION)
             print(f"incorrect protocol version: {protocol_version}")
         message_type = self.__ser.read(1)
-
-        payload_length = packet_length - 6
+        # print("message_type", message_type)
+        payload_length = packet_length - 7
         payload = self.__ser.read(payload_length)
+        # print("payload", payload)
 
         received_crc = self.__ser.read(1)
+        # print("received_crc", received_crc)
         computed_crc = self.compute_crc(
             start_marker
             + length_byte
@@ -106,6 +115,7 @@ class CustomProtocol:
             + payload
             + struct.pack(">BB", 0, 0xBB)
         )
+        # print("computed_crc", computed_crc)
 
         if received_crc != struct.pack(">B", computed_crc):
             self.send_ack(CRC)
@@ -114,32 +124,49 @@ class CustomProtocol:
             )
 
         end_marker = self.__ser.read(1)
+        # print("end_marker", end_marker)
         if end_marker != b"\xBB":
             self.send_ack(ENDING)
             print(f"not the last bit {end_marker}")
             pass
         match message_type:
             case b"a":
-                if payload == b"\x01":
-                    return b"success"
+                print("ack")
                 if payload == b"\x00":
-                    return b"fail"
+                    return b"success"
+                elif payload == b"\x01":
+                    return b"CRC incorrect"
+                elif payload == b"\x02":
+                    return b"version incorrect"
+                elif payload == b"\x03":
+                    return b"ending byte missing"
+                elif payload == b"\x04":
+                    return b"type unknow"
+                elif payload == b"\x05":
+                    return b"connection opened"
+                elif payload == b"\x06":
+                    return b"connection closed"
+                else:
+                    return b"unknow ack: " + payload
             case b"d":
+                print("data")
                 return payload
             case b"o":
+                print("open")
                 self.send_open()
                 return b"open"
             case b"c":
+                print("close")
                 self.send_close()
                 return b"close"
             case b"e":
-                print("echo")
+                print("echo", payload, len(payload))
                 self.send(payload)
                 return b"echo"
             case _:
-                self.send_ack(TYPE)
                 print("wrong")
-
+                self.send_ack(TYPE)
+                return b"unknow type: " + message_type
         return payload
 
     def disconnect(self):
@@ -154,8 +181,8 @@ class CustomProtocol:
         del self.__port
 
     def test(self):
-        packet_length = 6
-        header = struct.pack(">BBBB", 0xAA, packet_length, 2, ord("t"))
+        packet_length = 7
+        header = struct.pack(">BHBB", 0xAA, packet_length, 2, ord("t"))
         crc = self.compute_crc(header + struct.pack(">BB", 0, 0xBB))
         footer = struct.pack(">BB", crc, 0xBB)
         packet = header + footer
@@ -167,11 +194,27 @@ class CustomProtocol:
 
 p = CustomProtocol()
 p.connect()
-p.receive()
-p.receive()
+print(p.receive())
+# print(p.receive())
+# print(p.receive())
+# print(p.receive())
+# print(p.receive())
+# print(p.receive())
 # # print(p.compute_crc(b"The quick brown fox jumps over the lazy dog."))
-# # p.send_echo(b"hello world")
-# # print(p.receive())
+# p.send_echo(b"hello world")
+# print(p.receive())
+# p.send_echo(b"hello world")
+# print(p.receive())
+# p.send_echo(b"hello world")
+# print(p.receive())
+# p.send_echo(b"hello world")
+# print(p.receive())
+# p.disconnect()
+# p.connect()
+# print(p.receive())
+# print(p.receive())
+# print(p.receive())
+# p.send(b"hello")
 p.test()
 # print(p.compute_crc(bytes([0xFF for _ in range(256)])))
 

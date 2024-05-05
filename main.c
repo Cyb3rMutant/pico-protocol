@@ -11,7 +11,7 @@ int main() {
     while (1) {
         char h[] = "hello world!";
         // protocol_receive();
-        // protocol_send(h, strlen(h));
+        // protocol_send_echo(h, strlen(h));
         // protocol_send_ack(1);
         protocol_receive();
         // sleep_ms(250);
