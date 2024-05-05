@@ -12,18 +12,45 @@ CLOSED = 6
 
 
 class CustomProtocol:
+    """Implements a custom communication protocol over serial connection.
+
+    This class provides methods for establishing a connection, sending various types of packets,
+    receiving and parsing packets, disconnecting from the communication channel, and performing
+    cleanup. It supports packet construction, CRC-8 checksum computation, error handling, and
+    protocol version verification.
+
+    Attributes:
+        address (str): The address of the serial device (default is '/dev/ttyACM0').
+        port (int): The port number of the serial device (default is 115200).
+        __ser: Serial object representing the communication channel.
+    """
+
     def __init__(self, address: str = "/dev/ttyACM0", port: int = 115200):
-        """Initializes the communication module and establishes a connection."""
+        """Initialize CustomProtocol with specified address and port.
+
+        Args:
+            address (str, optional): The address of the serial device.
+                Defaults to "/dev/ttyACM0".
+            port (int, optional): The port number of the serial device.
+                Defaults to 115200.
+        """
         self.__address = address
         self.__port = port
 
     def connect(self):
-        """Opens a connection for communication."""
+        """Connect to the serial device and send an open packet."""
         self.__ser = serial.Serial(self.__address, self.__port)
         self.send_open()
 
     def compute_crc(self, data: bytes):
-        """Computes CRC-8 checksum for the given data."""
+        """Compute the CRC-8 checksum for the given data.
+
+        Args:
+            data (bytes): The data for which CRC-8 checksum needs to be computed.
+
+        Returns:
+            int: The computed CRC-8 checksum.
+        """
         crc = 0
         for byte in data:
             crc ^= byte
@@ -35,7 +62,11 @@ class CustomProtocol:
         return crc & 0xFF
 
     def send(self, payload: bytes):
-        """Constructs and sends a packet."""
+        """Construct and send a packet with the given payload.
+
+        Args:
+            payload (bytes): The payload to be sent.
+        """
         packet_length = len(payload) + 7
         header = struct.pack(">BHBB", 0xAA, packet_length, 2, ord("d"))
         packet = header + payload + struct.pack(">BB", 0, 0xBB)
@@ -45,7 +76,11 @@ class CustomProtocol:
         print(packet)
 
     def send_ack(self, err):
-        """Constructs and sends a packet."""
+        """Send an acknowledgment packet with the given error code.
+
+        Args:
+            err: The error code to be sent in the acknowledgment packet.
+        """
         packet_length = 1 + 7
         header = struct.pack(">BHBB", 0xAA, packet_length, 2, ord("a"))
         crc = self.compute_crc(header + struct.pack(">BBB", err, 0, 0xBB))
@@ -54,7 +89,7 @@ class CustomProtocol:
         self.__ser.write(packet)
 
     def send_open(self):
-        """Constructs and sends a packet."""
+        """Send an open packet."""
         packet_length = 7
         header = struct.pack(">BHBB", 0xAA, packet_length, 2, ord("o"))
         crc = self.compute_crc(header + struct.pack(">BB", 0, 0xBB))
@@ -63,7 +98,7 @@ class CustomProtocol:
         self.__ser.write(packet)
 
     def send_close(self):
-        """Constructs and sends a packet."""
+        """Send a close packet."""
         packet_length = 7
         header = struct.pack(">BHBB", 0xAA, packet_length, 2, ord("c"))
         crc = self.compute_crc(header + struct.pack(">BB", 0, 0xBB))
@@ -72,7 +107,11 @@ class CustomProtocol:
         self.__ser.write(packet)
 
     def send_echo(self, payload: bytes):
-        """Constructs and sends a packet."""
+        """Send an echo packet with the given payload.
+
+        Args:
+            payload (bytes): The payload to be echoed.
+        """
         packet_length = len(payload) + 7
         header = struct.pack(">BHBB", 0xAA, packet_length, 2, ord("e"))
         packet = header + payload + struct.pack(">BB", 0, 0xBB)
@@ -81,32 +120,25 @@ class CustomProtocol:
         self.__ser.write(packet)
 
     def receive(self):
-        """Receives and parses a packet."""
+        """Receive and process a packet."""
         start_marker = self.__ser.read(1)
         if start_marker != b"\xAA":
             # Discard bytes until start marker is found
             while start_marker != b"\xAA":
                 print("a---", start_marker)
-                # print("start_marker", start_marker)
                 start_marker = self.__ser.read(1)
 
         length_byte = self.__ser.read(2)
-        # print("length_byte", length_byte)
         packet_length = struct.unpack(">H", length_byte)[0]
-        # print("packet_length", packet_length)
         protocol_version = self.__ser.read(1)
-        # print("protocol_version", protocol_version)
         if protocol_version != b"\x02":
             self.send_ack(VERSION)
             print(f"incorrect protocol version: {protocol_version}")
         message_type = self.__ser.read(1)
-        # print("message_type", message_type)
         payload_length = packet_length - 7
         payload = self.__ser.read(payload_length)
-        # print("payload", payload)
 
         received_crc = self.__ser.read(1)
-        # print("received_crc", received_crc)
         computed_crc = self.compute_crc(
             start_marker
             + length_byte
@@ -115,7 +147,6 @@ class CustomProtocol:
             + payload
             + struct.pack(">BB", 0, 0xBB)
         )
-        # print("computed_crc", computed_crc)
 
         if received_crc != struct.pack(">B", computed_crc):
             self.send_ack(CRC)
@@ -124,7 +155,6 @@ class CustomProtocol:
             )
 
         end_marker = self.__ser.read(1)
-        # print("end_marker", end_marker)
         if end_marker != b"\xBB":
             self.send_ack(ENDING)
             print(f"not the last bit {end_marker}")
@@ -170,17 +200,18 @@ class CustomProtocol:
         return payload
 
     def disconnect(self):
-        """Closes the connection."""
+        """Send a close packet and close the serial connection."""
         self.send_close()
         self.__ser.close()
 
     def cleanup(self):
-        """Cleans up resources used by the communication module."""
+        """Clean up resources by deleting serial object and instance variables."""
         del self.__ser
         del self.__address
         del self.__port
 
     def test(self):
+        """Send a test packet and print received messages."""
         packet_length = 7
         header = struct.pack(">BHBB", 0xAA, packet_length, 2, ord("t"))
         crc = self.compute_crc(header + struct.pack(">BB", 0, 0xBB))
@@ -189,40 +220,11 @@ class CustomProtocol:
         self.__ser.write(packet)
         for _ in range(100):
             print(self.receive())
-            # sleep(1)
 
 
 p = CustomProtocol()
 p.connect()
+p.receive()
 p.test()
-print(p.receive())
-# print(p.receive())
-# print(p.receive())
-# print(p.receive())
-# print(p.receive())
-# print(p.receive())
-# # print(p.compute_crc(b"The quick brown fox jumps over the lazy dog."))
-# p.send_echo(b"hello world")
-# print(p.receive())
-# p.send_echo(b"hello world")
-# print(p.receive())
-# p.send_echo(b"hello world")
-# print(p.receive())
-# p.send_echo(b"hello world")
-# print(p.receive())
-# p.disconnect()
-# p.connect()
-# print(p.receive())
-# print(p.receive())
-# print(p.receive())
-# p.send(b"hello")
-p.test()
-# print(p.compute_crc(bytes([0xFF for _ in range(256)])))
 
-# p.send(b"hello world!")
-# p.send_ack(NO_ERROR)
-# sleep(1)
-# p.send_close()
-# print(p.receive())
-# print(p.receive())
-# print(p.receive())
+p.disconnect()
