@@ -31,6 +31,14 @@ and finally to view output:
 $ ./out.sh
 ```
 
+or you can run the python file
+
+```bash
+$ sudo python protocol.py
+```
+
+note that you cant run the python file and call receive, and run the `out.sh` script at the same time
+
 # Architecture
 
 ## USB Serial
